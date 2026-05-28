@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Defcom — Expense Governance Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+/* ── DELHIVERY BRAND PALETTE ─────────────────────────────
+   Primary Red  : #EA4333  (Cinnabar)
+   Dark Red     : #7F1D1D  (Crown of Thorns)
+   White        : #FFFFFF
+   Near-white bg: #F7F8FA
+   Surface      : #FFFFFF
+   Border       : #E5E7EB
+   Text primary : #111827
+   Text muted   : #6B7280
+   Text faint   : #9CA3AF
+   Status green : #059669
+   Status amber : #D97706
+   Status red   : #EA4333  (brand red doubles as alert)
+──────────────────────────────────────────────────────── */
+:root {
+  --bg:       #F7F8FA;
+  --surface:  #FFFFFF;
+  --surface2: #FEF2F2;
+  --surface3: #FEE2E2;
+  --border:   #E5E7EB;
+  --border2:  #D1D5DB;
+  --text:     #111827;
+  --text2:    #6B7280;
+  --text3:    #9CA3AF;
+  --accent:   #EA4333;
+  --accent-dk:#7F1D1D;
+  --accent2:  #C53030;
+  --green:    #059669;
+  --yellow:   #D97706;
+  --red:      #EA4333;
+  --orange:   #EA580C;
+  --font:     'Inter', sans-serif;
+  --mono:     'JetBrains Mono', monospace;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--text); font-family:var(--font); min-height:100vh; overflow-x:hidden; }
+
+/* SIDEBAR */
+.sidebar {
+  width: 220px; height:100vh; position:fixed; left:0; top:0;
+  background:var(--accent-dk);
+  display:flex; flex-direction:column; padding:24px 0; z-index:100;
+  box-shadow: 2px 0 12px rgba(127,29,29,0.15);
+}
+.logo { padding:0 20px 24px; border-bottom:1px solid rgba(255,255,255,0.12); }
+.logo-mark {
+  font-size:20px; font-weight:700; letter-spacing:1px; color:#FFFFFF;
+  display:flex; align-items:center; gap:8px;
+}
+.logo-mark .d-dot {
+  width:10px; height:10px; border-radius:50%; background:var(--accent); flex-shrink:0;
+}
+.logo-sub { font-size:10px; color:rgba(255,255,255,0.45); letter-spacing:1.2px; text-transform:uppercase; margin-top:5px; }
+.nav { padding:16px 0; flex:1; }
+.nav-item {
+  display:flex; align-items:center; gap:10px;
+  padding:10px 20px; cursor:pointer; font-size:13px; color:rgba(255,255,255,0.6);
+  transition:all .18s; border-left:3px solid transparent; margin:1px 0;
+}
+.nav-item:hover { color:#fff; background:rgba(255,255,255,0.08); }
+.nav-item.active { color:#fff; background:rgba(255,255,255,0.13); border-left-color:var(--accent); }
+.nav-icon { width:16px; height:16px; flex-shrink:0; }
+.sidebar-footer { padding:16px 20px; border-top:1px solid rgba(255,255,255,0.1); }
+.badge { background:var(--accent); color:#fff; font-size:10px; padding:3px 10px; border-radius:20px; font-family:var(--mono); display:inline-block; }
+
+/* TOPBAR */
+.topbar {
+  position:sticky; top:0; z-index:50;
+  background:#FFFFFF; border-bottom:1px solid var(--border);
+  padding:0 32px; height:52px;
+  display:flex; align-items:center; justify-content:space-between;
+  box-shadow:0 1px 4px rgba(0,0,0,0.05);
+}
+.topbar-brand { display:flex; align-items:center; gap:10px; }
+.topbar-brand span { font-size:13px; font-weight:600; color:var(--accent); letter-spacing:.5px; }
+.topbar-brand .sep { color:var(--border2); }
+.topbar-brand .page-name { font-size:13px; color:var(--text2); font-weight:400; }
+
+/* MAIN */
+.main { margin-left:220px; min-height:100vh; }
+.page-content { padding:24px 32px; }
+
+/* HEADER */
+.header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:24px; }
+.header-left h1 { font-size:20px; font-weight:700; letter-spacing:-.3px; color:var(--text); }
+.header-left p { color:var(--text2); font-size:13px; margin-top:3px; }
+.header-right { display:flex; gap:8px; align-items:center; }
+.filter-select {
+  background:#FFFFFF; border:1px solid var(--border); color:var(--text);
+  padding:8px 12px; border-radius:8px; font-size:12px; font-family:var(--font);
+  cursor:pointer; outline:none; appearance:none; min-width:130px;
+  box-shadow:0 1px 2px rgba(0,0,0,0.04);
+}
+.filter-select:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(234,67,51,0.1); }
+.btn-primary {
+  background:var(--accent); color:white; border:none; padding:8px 18px;
+  border-radius:8px; font-size:12px; font-weight:600; cursor:pointer;
+  font-family:var(--font); transition:.18s; box-shadow:0 1px 3px rgba(234,67,51,0.3);
+}
+.btn-primary:hover { background:var(--accent2); }
+
+/* PAGES */
+.page { display:none; }
+.page.active { display:block; }
+
+/* KPI GRID */
+.kpi-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:22px; }
+.kpi-card {
+  background:#FFFFFF; border:1px solid var(--border); border-radius:12px;
+  padding:18px 20px; position:relative; overflow:hidden; transition:.18s;
+  box-shadow:0 1px 4px rgba(0,0,0,0.05);
+}
+.kpi-card:hover { border-color:var(--accent); transform:translateY(-2px); box-shadow:0 4px 14px rgba(234,67,51,0.1); }
+.kpi-card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:3px;
+  background:var(--accent-color, var(--accent));
+}
+.kpi-card.red::before { --accent-color: var(--red); }
+.kpi-card.green::before { --accent-color: var(--green); }
+.kpi-card.yellow::before { --accent-color: var(--yellow); }
+.kpi-card.purple::before { --accent-color: var(--accent-dk); }
+.kpi-label { font-size:10.5px; color:var(--text3); text-transform:uppercase; letter-spacing:.9px; margin-bottom:10px; font-weight:500; }
+.kpi-value { font-size:26px; font-weight:700; letter-spacing:-.5px; line-height:1; color:var(--text); }
+.kpi-value.red { color:var(--red); }
+.kpi-value.green { color:var(--green); }
+.kpi-value.yellow { color:var(--yellow); }
+.kpi-sub { font-size:11px; color:var(--text3); margin-top:8px; }
+.kpi-delta { display:inline-flex; align-items:center; gap:3px; font-size:11px; padding:2px 7px; border-radius:4px; margin-top:6px; }
+.kpi-delta.up { background:rgba(234,67,51,.1); color:var(--red); }
+.kpi-delta.down { background:rgba(5,150,105,.1); color:var(--green); }
+
+/* SECTION */
+.section { margin-bottom:22px; }
+.section-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+.section-title { font-size:14px; font-weight:700; color:var(--text); }
+.section-sub { font-size:12px; color:var(--text3); }
+
+/* CHART GRID */
+.chart-grid { display:grid; grid-template-columns:2fr 1fr; gap:14px; margin-bottom:22px; }
+.chart-box {
+  background:#FFFFFF; border:1px solid var(--border); border-radius:12px;
+  padding:20px; box-shadow:0 1px 4px rgba(0,0,0,0.05);
+}
+.chart-box canvas { max-height:240px; }
+
+/* TABLE */
+.table-wrap {
+  background:#FFFFFF; border:1px solid var(--border); border-radius:12px;
+  overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,0.04);
+}
+.table-wrap table { width:100%; border-collapse:collapse; }
+.table-wrap thead th {
+  background:#FEF2F2; padding:10px 16px; text-align:left;
+  font-size:10.5px; color:var(--accent-dk); text-transform:uppercase; letter-spacing:.8px;
+  border-bottom:1px solid #FECACA; font-weight:600;
+}
+.table-wrap tbody td { padding:12px 16px; font-size:13px; border-bottom:1px solid var(--border); color:var(--text); }
+.table-wrap tbody tr:last-child td { border-bottom:none; }
+.table-wrap tbody tr:hover { background:#FFF8F8; }
+.rank-num { color:var(--text3); font-family:var(--mono); font-size:11px; }
+.name-cell { font-weight:500; color:var(--text); }
+.name-cell span { display:block; font-size:11px; color:var(--text3); margin-top:2px; font-weight:400; }
+.amount { font-family:var(--mono); font-size:13px; color:var(--text); font-weight:500; }
+.severity { display:inline-flex; align-items:center; gap:5px; font-size:11px; padding:3px 9px; border-radius:20px; font-weight:600; }
+.severity.critical { background:rgba(234,67,51,.1); color:var(--red); }
+.severity.high { background:rgba(234,88,12,.1); color:var(--orange); }
+.severity.medium { background:rgba(217,119,6,.1); color:var(--yellow); }
+.severity.low { background:rgba(5,150,105,.1); color:var(--green); }
+.dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+.bar-cell { display:flex; align-items:center; gap:8px; }
+.bar-bg { flex:1; height:5px; background:#F3F4F6; border-radius:3px; }
+.bar-fill { height:5px; border-radius:3px; background:var(--accent); }
+
+/* MAP */
+.map-box { background:#FFFFFF; border:1px solid var(--border); border-radius:12px; overflow:hidden; margin-bottom:22px; box-shadow:0 1px 4px rgba(0,0,0,0.05); }
+.map-header { padding:14px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:#FEF2F2; }
+#map { height:500px; width:100%; }
+.leaflet-container { background:#F7F8FA !important; }
+
+/* TWO COL */
+.two-col { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:22px; }
+
+/* HIERARCHY CARD */
+.hier-cards { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px; }
+.hier-card {
+  background:#FFFFFF; border:1px solid var(--border); border-radius:12px;
+  padding:16px; cursor:pointer; transition:.18s;
+  box-shadow:0 1px 3px rgba(0,0,0,0.05);
+}
+.hier-card:hover { border-color:var(--accent); box-shadow:0 4px 12px rgba(234,67,51,0.1); transform:translateY(-1px); }
+.hier-card h3 { font-size:13px; font-weight:600; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text); }
+.hier-card .role { font-size:10px; color:var(--accent); text-transform:uppercase; letter-spacing:.8px; margin-bottom:10px; font-weight:600; }
+.hier-card .amount { font-size:18px; font-weight:700; font-family:var(--mono); }
+.hier-card .meta { font-size:11px; color:var(--text2); margin-top:4px; }
+
+/* TABS */
+.tabs { display:flex; gap:4px; padding:4px; background:#F3F4F6; border-radius:10px; width:fit-content; margin-bottom:20px; border:1px solid var(--border); }
+.tab { padding:7px 18px; border-radius:7px; font-size:12px; font-weight:500; cursor:pointer; color:var(--text2); transition:.18s; }
+.tab.active { background:#FFFFFF; color:var(--accent); box-shadow:0 1px 4px rgba(0,0,0,0.08); font-weight:600; }
+.tab:hover:not(.active) { color:var(--text); }
+
+/* ANOMALY */
+.anomaly-list { display:flex; flex-direction:column; gap:8px; }
+.anomaly-item {
+  background:#FFFFFF; border:1px solid var(--border); border-radius:10px;
+  padding:14px 16px; display:flex; align-items:center; gap:14px; transition:.18s;
+  box-shadow:0 1px 3px rgba(0,0,0,0.04);
+}
+.anomaly-item:hover { border-color:var(--accent); box-shadow:0 2px 10px rgba(234,67,51,0.08); }
+.anomaly-icon { width:38px; height:38px; border-radius:9px; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:17px; }
+.anomaly-icon.red { background:#FEE2E2; }
+.anomaly-icon.yellow { background:#FEF3C7; }
+.anomaly-icon.blue { background:#EEF2FF; }
+.anomaly-body { flex:1; }
+.anomaly-title { font-size:13px; font-weight:600; color:var(--text); }
+.anomaly-desc { font-size:11px; color:var(--text2); margin-top:2px; }
+.anomaly-amt { font-family:var(--mono); font-size:13px; color:var(--red); font-weight:700; }
+
+/* LEGEND */
+.legend { display:flex; gap:14px; flex-wrap:wrap; }
+.legend-item { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text2); }
+.legend-dot { width:8px; height:8px; border-radius:50%; }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width:5px; height:5px; }
+::-webkit-scrollbar-track { background:var(--bg); }
+::-webkit-scrollbar-thumb { background:#D1D5DB; border-radius:3px; }
+::-webkit-scrollbar-thumb:hover { background:var(--accent); }
+
+/* DIVIDER accent line on page content top */
+.page-content::before {
+  content:''; display:block; height:3px;
+  background:linear-gradient(90deg, var(--accent) 0%, var(--accent-dk) 100%);
+  border-radius:0 0 3px 3px; margin:-24px -32px 24px;
+}
+
+/* RESPONSIVE */
+@media(max-width:1400px) { .kpi-grid { grid-template-columns:repeat(3,1fr); } }
+@media(max-width:1100px) { .chart-grid { grid-template-columns:1fr; } .two-col { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="logo">
+    <div class="logo-mark"><span class="d-dot"></span>DEFCOM</div>
+    <div class="logo-sub">Expense Governance</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-item active" onclick="showPage('overview',this)">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Overview
+    </div>
+    <div class="nav-item" onclick="showPage('heatmap',this)">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg>
+      Geo Heatmap
+    </div>
+    <div class="nav-item" onclick="showPage('hierarchy',this)">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+      Hierarchy
+    </div>
+    <div class="nav-item" onclick="showPage('categories',this)">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+      Categories
+    </div>
+    <div class="nav-item" onclick="showPage('anomaly',this)">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Anomaly Detection
+    </div>
+    <div class="nav-item" onclick="showPage('centers',this)">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+      Center Drilldown
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="badge">April 2026 Data</div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-brand">
+      <span>Delhivery</span>
+      <span class="sep">·</span>
+      <span class="page-name" id="topbar-page-name">Executive Overview</span>
+    </div>
+    <div style="font-size:11px;color:var(--text3);font-family:var(--mono)">Data: April 2026 · 25,224 transactions</div>
+  </div>
+
+  <div class="page-content">
+
+  <!-- OVERVIEW PAGE -->
+  <div class="page active" id="page-overview">
+    <div class="header">
+      <div class="header-left">
+        <h1>Executive Overview</h1>
+        <p>Leadership Visibility & Expense Governance · 2026</p>
+      </div>
+      <div class="header-right">
+        <select class="filter-select" id="monthFilter" onchange="updateDashboard()">
+          <option value="all">All Months</option>
+          <option value="1">January 2026</option>
+          <option value="2">February 2026</option>
+          <option value="3">March 2026</option>
+          <option value="4" selected>April 2026</option>
+          <option value="5">May 2026</option>
+        </select>
+        <select class="filter-select" id="sdFilter" onchange="updateDashboard()">
+          <option value="all">All SDs</option>
+        </select>
+        <button class="btn-primary">Export Report</button>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Total Approved Spend</div>
+        <div class="kpi-value" id="kpi-total">₹12.07 Cr</div>
+        <div class="kpi-sub">Apr 2026 Approved</div>
+      </div>
+      <div class="kpi-card red">
+        <div class="kpi-label">High-Spend Centers</div>
+        <div class="kpi-value red" id="kpi-centers">3,301</div>
+        <div class="kpi-sub">Active centers · 2026</div>
+      </div>
+      <div class="kpi-card yellow">
+        <div class="kpi-label">Pending Approvals</div>
+        <div class="kpi-value yellow">₹35.0 L</div>
+        <div class="kpi-sub">Awaiting clearance</div>
+      </div>
+      <div class="kpi-card red">
+        <div class="kpi-label">Rejected Amount</div>
+        <div class="kpi-value red">₹2.59 Cr</div>
+        <div class="kpi-sub">Flagged &amp; rejected</div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-label">Top Category</div>
+        <div class="kpi-value" style="font-size:15px;color:var(--text)">Electricity</div>
+        <div class="kpi-sub">53.9% of total spend</div>
+      </div>
+    </div>
+
+    <!-- CHARTS -->
+    <div class="chart-grid">
+      <div class="chart-box">
+        <div class="section-head">
+          <div>
+            <div class="section-title">Monthly Expense Trend · 2026</div>
+            <div class="section-sub">Approved transactions only</div>
+          </div>
+          <div class="legend">
+            <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div>Actual</div>
+          </div>
+        </div>
+        <canvas id="monthlyChart"></canvas>
+      </div>
+      <div class="chart-box">
+        <div class="section-head">
+          <div class="section-title">Expense by Category</div>
+        </div>
+        <canvas id="categoryDonut"></canvas>
+      </div>
+    </div>
+
+    <!-- SD TABLE -->
+    <div class="section">
+      <div class="section-head">
+        <div>
+          <div class="section-title">Senior Director Performance · Ranked by Spend</div>
+          <div class="section-sub">Sorted by total approved expense (highest deviation first)</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Senior Director</th>
+              <th>Total Expense</th>
+              <th>Centers</th>
+              <th>Share of Total</th>
+              <th>Severity</th>
+            </tr>
+          </thead>
+          <tbody id="sd-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- HEATMAP PAGE -->
+  <div class="page" id="page-heatmap">
+    <div class="header">
+      <div class="header-left">
+        <h1>Geo Expense Heatmap</h1>
+        <p>Center-wise spend intensity across India</p>
+      </div>
+    </div>
+    <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="kpi-card"><div class="kpi-label">Top Center</div><div class="kpi-value" style="font-size:15px">Bhiwandi GW</div><div class="kpi-sub">Maharashtra · ₹1.63 Cr</div></div>
+      <div class="kpi-card red"><div class="kpi-label">States Covered</div><div class="kpi-value red">29+</div><div class="kpi-sub">Pan-India footprint</div></div>
+      <div class="kpi-card yellow"><div class="kpi-label">Map Centers</div><div class="kpi-value yellow">100</div><div class="kpi-sub">Top 100 by spend</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Avg per Center</div><div class="kpi-value green">₹3.65 L</div><div class="kpi-sub">Among top 100</div></div>
+    </div>
+    <div class="map-box">
+      <div class="map-header">
+        <div class="section-title">India — Center Spend Map (Top 100)</div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#ff4d6a"></div>&gt;₹1Cr</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#ff8c42"></div>₹50L–₹1Cr</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#f5c842"></div>₹10L–₹50L</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#3b7eff"></div>&lt;₹10L</div>
+        </div>
+      </div>
+      <div id="map"></div>
+    </div>
+  </div>
+
+  <!-- HIERARCHY PAGE -->
+  <div class="page" id="page-hierarchy">
+    <div class="header">
+      <div class="header-left">
+        <h1>Hierarchy Analysis</h1>
+        <p>SD → Director → SM → Center drilldown</p>
+      </div>
+    </div>
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('sd-tab',this)">Senior Director</div>
+      <div class="tab" onclick="switchTab('director-tab',this)">Director</div>
+    </div>
+    <div id="sd-tab">
+      <div class="hier-cards" id="sd-cards"></div>
+      <div class="section-head"><div class="section-title">All Senior Directors · Ranked by Spend</div></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Senior Director</th><th>Total Expense</th><th>Centers</th><th>Share</th><th>Severity</th></tr></thead>
+          <tbody id="sd-hier-body"></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="director-tab" style="display:none">
+      <div class="section-head"><div class="section-title">All Directors · Ranked by Spend</div></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Director</th><th>Reports To (SD)</th><th>Total Expense</th><th>Centers</th><th>Severity</th></tr></thead>
+          <tbody id="dir-hier-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- CATEGORIES PAGE -->
+  <div class="page" id="page-categories">
+    <div class="header">
+      <div class="header-left">
+        <h1>Expense Categories</h1>
+        <p>Category-wise spend analysis &amp; benchmark logic</p>
+      </div>
+    </div>
+    <div class="two-col">
+      <div class="chart-box">
+        <div class="section-head"><div class="section-title">Category Spend Breakdown</div></div>
+        <canvas id="catBarChart"></canvas>
+      </div>
+      <div>
+        <div class="section-head"><div class="section-title">Benchmark Logic Summary</div></div>
+        <div class="anomaly-list" id="benchmark-cards"></div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-head"><div class="section-title">Category Spend Table</div></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Category</th><th>Total Spend</th><th>% of Total</th><th>Benchmark Logic</th><th>Status</th></tr></thead>
+          <tbody id="cat-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ANOMALY PAGE -->
+  <div class="page" id="page-anomaly">
+    <div class="header">
+      <div class="header-left">
+        <h1>Anomaly Detection</h1>
+        <p>Flagged centers &amp; risk signals requiring immediate attention</p>
+      </div>
+    </div>
+    <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="kpi-card red"><div class="kpi-label">Critical Alerts</div><div class="kpi-value red">3</div><div class="kpi-sub">Extreme spend outliers</div></div>
+      <div class="kpi-card yellow"><div class="kpi-label">High Risk</div><div class="kpi-value yellow">8</div><div class="kpi-sub">Needs review</div></div>
+      <div class="kpi-card"><div class="kpi-label">Rejected Bills</div><div class="kpi-value">1,328</div><div class="kpi-sub">Flagged transactions</div></div>
+      <div class="kpi-card"><div class="kpi-label">Rejection Rate</div><div class="kpi-value">4.9%</div><div class="kpi-sub">Of all submissions</div></div>
+    </div>
+    <div class="section">
+      <div class="section-head"><div class="section-title">Anomaly Signals</div></div>
+      <div class="anomaly-list" id="anomaly-list"></div>
+    </div>
+    <div class="section">
+      <div class="section-head"><div class="section-title">MoM Trend — Spend Spike Analysis</div></div>
+      <div class="chart-box">
+        <canvas id="spikeChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTERS PAGE -->
+  <div class="page" id="page-centers">
+    <div class="header">
+      <div class="header-left">
+        <h1>Center Drilldown</h1>
+        <p>Top 25 centers by approved spend</p>
+      </div>
+      <div class="header-right">
+        <select class="filter-select" id="centerSdFilter">
+          <option value="all">All SDs</option>
+        </select>
+      </div>
+    </div>
+    <div class="section">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Center Name</th>
+              <th>Senior Director</th>
+              <th>Director</th>
+              <th>Total Spend</th>
+              <th>Share</th>
+              <th>Severity</th>
+            </tr>
+          </thead>
+          <tbody id="centers-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- /page-content -->
+</div><!-- /main -->
+
+<script>
+// ==================== DATA ====================
+const DATA = {
+  monthly: {"1":322570.22,"2":1241224.22,"3":21270770.17,"4":97690242.57,"5":139957.35},
+  categories: {
+    "Electricity Expenses":65101314.39,
+    "Staff Welfare Expenses":29700411.17,
+    "Water Expenses":8070212.39,
+    "Labourer Charges":7105359.39,
+    "Office Maintenance Expenses":5425349.58,
+    "Internet Expenses":1441804.08,
+    "Office consumables":938184.79,
+    "Power & Fuel Expense":657721.85
+  },
+  sd_list: [
+    {name:"Altesh Shaikh",total:16450974.22,centers:3},
+    {name:"Niraj Srivastav",total:12363222.39,centers:61},
+    {name:"Manjot Dhillon",total:8927076.38,centers:1},
+    {name:"S N S Ravi Kumar",total:8313025.28,centers:12},
+    {name:"Harshad Joshi",total:7345089.77,centers:27},
+    {name:"Amit Kumar",total:6924655.75,centers:33},
+    {name:"Chandrasekhar Desireddy",total:6726640.80,centers:687},
+    {name:"Harshit Gangwar",total:5650026.95,centers:617},
+    {name:"Gourav Kumar",total:4837723.11,centers:13},
+    {name:"Nishant Bhatia",total:4537723.04,centers:25},
+    {name:"Mithun Chakraborty",total:4036374.98,centers:423},
+    {name:"Anupam Banerjee",total:3724692.68,centers:613},
+    {name:"Nilesh Maheshwari",total:3557706.45,centers:7},
+    {name:"Himanshu Shekhar",total:3430132.46,centers:14},
+    {name:"Abdul M",total:2985501.41,centers:174}
+  ],
+  d_list: [
+    {name:"Atharva Godse/Tushar Disankit",sd:"Altesh Shaikh",total:16305394.22,centers:1},
+    {name:"Mukesh Choudhary/Abhinav Kumar",sd:"Manjot Dhillon",total:8927076.38,centers:1},
+    {name:"Balasubramaniam Meyyappan/Varul Garg",sd:"S N S Ravi Kumar",total:7769613.18,centers:2},
+    {name:"Gajulapalli Reddy",sd:"Niraj Srivastav",total:5464114.97,centers:14},
+    {name:"V M Raghupatruni",sd:"Chandrasekhar Desireddy",total:3586293.05,centers:421},
+    {name:"Nilesh Maheshwari",sd:"Nilesh Maheshwari",total:3557706.45,centers:7},
+    {name:"Jawwad Ahmad Khan",sd:"Gourav Kumar",total:3262058.49,centers:6},
+    {name:"N Prabhakar",sd:"Amit Kumar",total:3072992.55,centers:6},
+    {name:"Vishwadeep Srivastava",sd:"Nishant Bhatia",total:3059280.87,centers:18},
+    {name:"Abdul M",sd:"Abdul M",total:2985501.41,centers:174},
+    {name:"Preetam Kumar Mishra/Sujan Routray",sd:"Niraj Srivastav",total:2964854.15,centers:2},
+    {name:"Varun Pimplapure",sd:"Harshad Joshi",total:2922723.47,centers:10},
+    {name:"Derik Paiza",sd:"Harshad Joshi",total:2820259.74,centers:6},
+    {name:"Aashish Kumar",sd:"Mithun Chakraborty",total:2258963.35,centers:223},
+    {name:"Chandrasekhar Desireddy",sd:"Chandrasekhar Desireddy",total:2249203.83,centers:126}
+  ],
+  top_centers: [
+    {name:"Bhiwandi_Lonad_GW (Maharashtra)",sd:"Altesh Shaikh",d:"Atharva Godse/Tushar Disankit",total:16305394.22,lat:19.285315,lng:73.14163},
+    {name:"Gurgaon_Tauru_GW (Haryana)",sd:"Manjot Dhillon",d:"Mukesh Choudhary",total:8927076.38,lat:28.267542,lng:76.89965},
+    {name:"Bangalore_Hoskote_GW (Karnataka)",sd:"S N S Ravi Kumar",d:"Balasubramaniam Meyyappan",total:7328430.64,lat:13.070751,lng:77.83016},
+    {name:"Hyderabad_Medchal_GW (Telangana)",sd:"Niraj Srivastav",d:"Gajulapalli Reddy",total:4483754.76,lat:17.701906,lng:78.52694},
+    {name:"Lucknow_Bhokapur_GW (Uttar Pradesh)",sd:"Gourav Kumar",d:"Jawwad Ahmad Khan",total:2910204.53,lat:26.672667,lng:80.79236},
+    {name:"Chennai_Sriperumbudur_GW (Tamil Nadu)",sd:"Amit Kumar",d:"N Prabhakar",total:2794642.65,lat:12.880392,lng:79.90999},
+    {name:"Kolkata_Dankuni_GW (West Bengal)",sd:"Niraj Srivastav",d:"Preetam Kumar Mishra",total:2756062.74,lat:22.703012,lng:88.27855},
+    {name:"Surat_Kacholi_GW (Gujarat)",sd:"Harshad Joshi",d:"Derik Paiza",total:2347725.04,lat:21.091019,lng:72.929855},
+    {name:"Nagpur_Khapari_GW (Maharashtra)",sd:"Harshad Joshi",d:"Varun Pimplapure",total:2341290.48,lat:21.161617,lng:78.890686},
+    {name:"Faridabad_MathuraRoad_GW (Haryana)",sd:"Nishant Bhatia",d:"Vishwadeep Srivastava",total:1945456.39,lat:28.482635,lng:77.30221},
+    {name:"Jaipur_Sez_GW (Rajasthan)",sd:"Nilesh Maheshwari",d:"Nilesh Maheshwari",total:1822989.69,lat:26.813782,lng:75.666275},
+    {name:"Jaipur_Jaisinghpura_GW (Rajasthan)",sd:"Nilesh Maheshwari",d:"Nilesh Maheshwari",total:1610031.76,lat:26.857452,lng:75.69642},
+    {name:"Pune_Sudhwadi_GW (Maharashtra)",sd:"Narender",d:"Ankan Mondal",total:1293736.37,lat:18.744974,lng:73.74623},
+    {name:"PNQFC5 (Maharashtra)",sd:"Himanshu Shekhar",d:"Richa Tiwari",total:1184199.66,lat:18.814316,lng:73.70017},
+    {name:"Indore_Dakachya_GW (Madhya Pradesh)",sd:"Harshad Joshi",d:"Abhishek Patidar",total:1058067.0,lat:22.855211,lng:75.95033},
+    {name:"Noida_Bairangpur_GW (Uttar Pradesh)",sd:"Nishant Bhatia",d:"Dev Kumar Verma",total:921192.0,lat:28.528297,lng:77.5888},
+    {name:"Ahmedabad_Kanera_GW (Gujarat)",sd:"Jagrat Agar",d:"Ronak Prajapati",total:907439.7,lat:22.817303,lng:72.609634},
+    {name:"BOMFC1 (Maharashtra)",sd:"Himanshu Shekhar",d:"Richa Tiwari",total:740026.0,lat:19.335854,lng:73.104454},
+    {name:"GGNFC12 (Haryana)",sd:"Sayari Pal",d:"Nitish Thakur",total:712406.93,lat:28.380499,lng:76.69475},
+    {name:"Kanpur_Kataraghan_H (Uttar Pradesh)",sd:"Gourav Kumar",d:"Udit Maheshwari",total:658769.8,lat:26.438656,lng:80.15954},
+    {name:"Hyderabad_Shamshbd_H (Telangana)",sd:"Niraj Srivastav",d:"Gajulapalli Reddy",total:641863.21,lat:17.239107,lng:78.3947},
+    {name:"Siliguri_Jugibhita_GW (West Bengal)",sd:"Niraj Srivastav",d:"Atique Hussain",total:569028.98,lat:26.635927,lng:88.46299},
+    {name:"BLRFC11 (Karnataka)",sd:"Shahnwas Ansari",d:"Shahnwas Ansari",total:532189.54,lat:12.9245,lng:77.90609},
+    {name:"Guwahati_KaliPahar_GW (Assam)",sd:"Niraj Srivastav",d:"Apalab Boruah",total:528863.0,lat:26.23,lng:91.691414},
+    {name:"Kozhikode_Central_H (Kerala)",sd:"Amit Kumar",d:"Ajith K",total:513346.99,lat:11.155895,lng:75.89158}
+  ],
+  map_centers: [
+    {name:"Bhiwandi_Lonad_GW (Maharashtra)",total:16305394.22,lat:19.285315,lng:73.14163,sd:"Altesh Shaikh"},
+    {name:"Gurgaon_Tauru_GW (Haryana)",total:8927076.38,lat:28.267542,lng:76.89965,sd:"Manjot Dhillon"},
+    {name:"Bangalore_Hoskote_GW (Karnataka)",total:7328430.64,lat:13.070751,lng:77.83016,sd:"S N S Ravi Kumar"},
+    {name:"Hyderabad_Medchal_GW (Telangana)",total:4483754.76,lat:17.701906,lng:78.52694,sd:"Niraj Srivastav"},
+    {name:"Lucknow_Bhokapur_GW (Uttar Pradesh)",total:2910204.53,lat:26.672667,lng:80.79236,sd:"Gourav Kumar"},
+    {name:"Chennai_Sriperumbudur_GW (Tamil Nadu)",total:2794642.65,lat:12.880392,lng:79.90999,sd:"Amit Kumar"},
+    {name:"Kolkata_Dankuni_GW (West Bengal)",total:2756062.74,lat:22.703012,lng:88.27855,sd:"Niraj Srivastav"},
+    {name:"Surat_Kacholi_GW (Gujarat)",total:2347725.04,lat:21.091019,lng:72.929855,sd:"Harshad Joshi"},
+    {name:"Nagpur_Khapari_GW (Maharashtra)",total:2341290.48,lat:21.161617,lng:78.890686,sd:"Harshad Joshi"},
+    {name:"Faridabad_MathuraRoad_GW (Haryana)",total:1945456.39,lat:28.482635,lng:77.30221,sd:"Nishant Bhatia"},
+    {name:"Jaipur_Sez_GW (Rajasthan)",total:1822989.69,lat:26.813782,lng:75.666275,sd:"Nilesh Maheshwari"},
+    {name:"Jaipur_Jaisinghpura_GW (Rajasthan)",total:1610031.76,lat:26.857452,lng:75.69642,sd:"Nilesh Maheshwari"},
+    {name:"Pune_Sudhwadi_GW (Maharashtra)",total:1293736.37,lat:18.744974,lng:73.74623,sd:"Narender"},
+    {name:"PNQFC5 (Maharashtra)",total:1184199.66,lat:18.814316,lng:73.70017,sd:"Himanshu Shekhar"},
+    {name:"Indore_Dakachya_GW (Madhya Pradesh)",total:1058067.0,lat:22.855211,lng:75.95033,sd:"Harshad Joshi"},
+    {name:"Noida_Bairangpur_GW (Uttar Pradesh)",total:921192.0,lat:28.528297,lng:77.5888,sd:"Nishant Bhatia"},
+    {name:"Ahmedabad_Kanera_GW (Gujarat)",total:907439.7,lat:22.817303,lng:72.609634,sd:"Jagrat Agar"},
+    {name:"BOMFC1 (Maharashtra)",total:740026.0,lat:19.335854,lng:73.104454,sd:"Himanshu Shekhar"},
+    {name:"GGNFC12 (Haryana)",total:712406.93,lat:28.380499,lng:76.69475,sd:"Sayari Pal"},
+    {name:"Kanpur_Kataraghan_H (Uttar Pradesh)",total:658769.8,lat:26.438656,lng:80.15954,sd:"Gourav Kumar"},
+    {name:"Hyderabad_Shamshbd_H (Telangana)",total:641863.21,lat:17.239107,lng:78.3947,sd:"Niraj Srivastav"},
+    {name:"Siliguri_Jugibhita_GW (West Bengal)",total:569028.98,lat:26.635927,lng:88.46299,sd:"Niraj Srivastav"},
+    {name:"BLRFC11 (Karnataka)",total:532189.54,lat:12.9245,lng:77.90609,sd:"Shahnwas Ansari"},
+    {name:"Guwahati_KaliPahar_GW (Assam)",total:528863.0,lat:26.23,lng:91.691414,sd:"Niraj Srivastav"},
+    {name:"Kozhikode_Central_H (Kerala)",total:513346.99,lat:11.155895,lng:75.89158,sd:"Amit Kumar"},
+    {name:"Vijayawada_Gudavalli_H (Andhra Pradesh)",total:502673.0,lat:16.516071,lng:80.75493,sd:"Niraj Srivastav"},
+    {name:"Bangalore_Nelamangla_H (Karnataka)",total:441182.54,lat:13.09066,lng:77.439476,sd:"S N S Ravi Kumar"},
+    {name:"Delhi_Airport_GW (Delhi)",total:435617.27,lat:28.553436,lng:77.1067,sd:"Nishant Bhatia"},
+    {name:"Mumbai_KurlaWest_P (Maharashtra)",total:425515.96,lat:19.08722,lng:72.88411,sd:"Narender"},
+    {name:"GGNFC3 (Haryana)",total:403536.9,lat:28.386927,lng:77.004135,sd:"Sayari Pal"},
+    {name:"Madurai_Avaniyapuram_H (Tamil Nadu)",total:400623.05,lat:9.865566,lng:78.12319,sd:"Amit Kumar"},
+    {name:"Varanasi_Khajuri_H (Uttar Pradesh)",total:399480.82,lat:25.276583,lng:82.80114,sd:"Gourav Kumar"},
+    {name:"Kannur_Koodali_H (Kerala)",total:382007.0,lat:11.955281,lng:75.480576,sd:"Amit Kumar"},
+    {name:"Bhubaneswar_Bampakhuda_GW (Orissa)",total:370077.0,lat:20.380371,lng:85.88597,sd:"Kunal Sethy"},
+    {name:"Agra_Jaupura_H (Uttar Pradesh)",total:353402.0,lat:27.206944,lng:77.916115,sd:"Gourav Kumar"},
+    {name:"Kollam_Kilikollur_H (Kerala)",total:335157.82,lat:8.900944,lng:76.62121,sd:"Amit Kumar"},
+    {name:"Rajkot_Amargadh_H (Gujarat)",total:293219.15,lat:22.310806,lng:70.869606,sd:"Jagrat Agar"},
+    {name:"Mangalore_Katipalla_H (Karnataka)",total:286824.0,lat:12.982772,lng:74.828445,sd:"Amit Kumar"},
+    {name:"Jammu_Baribrahmana_H (J&K)",total:271364.98,lat:32.64372,lng:74.92016,sd:"Nitesh Sethi"},
+    {name:"Vadodara_Dashrath_H (Gujarat)",total:259006.61,lat:22.378849,lng:73.15775,sd:"Harshad Joshi"},
+    {name:"Tirupati_RAgraharam_H (AP)",total:141692.9,lat:13.634274,lng:79.51604,sd:"Amit Kumar"},
+    {name:"Goa_Cortalim_H (Goa)",total:122157.95,lat:15.375,lng:73.905,sd:"Amit Kumar"},
+    {name:"Mysore_Hebbalestate_H (Karnataka)",total:121467.0,lat:12.35159,lng:76.59374,sd:"Amit Kumar"},
+    {name:"Patna_Janarjanpur_H (Bihar)",total:161484.95,lat:25.479168,lng:85.29764,sd:"Niraj Srivastav"},
+    {name:"Ranchi_Sidroll_H (Jharkhand)",total:138908.0,lat:23.312994,lng:85.38949,sd:"Niraj Srivastav"},
+    {name:"Raipur_Guma_H (Chhattisgarh)",total:171654.0,lat:21.30183,lng:81.563385,sd:"Harshad Joshi"},
+    {name:"Bhopal_Pipaliya_H (Madhya Pradesh)",total:140012.58,lat:23.328651,lng:77.48986,sd:"Harshad Joshi"},
+    {name:"Bareilly_Sathrapur_H (UP)",total:170886.0,lat:28.264093,lng:79.50731,sd:"Nitesh Sethi"},
+    {name:"Amritsar_VerkaBypss_I (Punjab)",total:163525.0,lat:31.655184,lng:74.919945,sd:"Nitesh Sethi"},
+    {name:"Gorakhpur_Bhauwapar_H (UP)",total:167503.96,lat:26.673876,lng:83.358955,sd:"Gourav Kumar"},
+    {name:"Meerut_Panchlikhurd_H (UP)",total:162539.0,lat:28.961327,lng:77.62649,sd:"Nishant Bhatia"}
+  ],
+  total_approved: 120664764.53,
+  total_centers: 3301,
+  total_txns: 25224,
+  total_sds: 33
+};
+
+// ==================== UTILS ====================
+function fmtINR(v) {
+  if (v >= 10000000) return '₹' + (v/10000000).toFixed(2) + ' Cr';
+  if (v >= 100000) return '₹' + (v/100000).toFixed(1) + ' L';
+  if (v >= 1000) return '₹' + (v/1000).toFixed(0) + 'K';
+  return '₹' + v.toFixed(0);
+}
+function pct(v, total) { return ((v/total)*100).toFixed(1) + '%'; }
+function severity(share) {
+  if (share > 10) return '<span class="severity critical"><span class="dot"></span>Critical</span>';
+  if (share > 5) return '<span class="severity high"><span class="dot"></span>High</span>';
+  if (share > 2) return '<span class="severity medium"><span class="dot"></span>Medium</span>';
+  return '<span class="severity low"><span class="dot"></span>Normal</span>';
+}
+
+// ==================== NAVIGATION ====================
+function showPage(id, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  el.classList.add('active');
+  const names = {overview:'Executive Overview',heatmap:'Geo Heatmap',hierarchy:'Hierarchy Analysis',categories:'Expense Categories',anomaly:'Anomaly Detection',centers:'Center Drilldown'};
+  document.getElementById('topbar-page-name').textContent = names[id] || '';
+  if (id === 'heatmap') setTimeout(initMap, 100);
+}
+function switchTab(id, el) {
+  document.querySelectorAll('#page-hierarchy > div[id$="-tab"]').forEach(t => t.style.display = 'none');
+  document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).style.display = 'block';
+  el.classList.add('active');
+}
+
+// ==================== CHARTS ====================
+let charts = {};
+
+function initCharts() {
+  const RED = '#EA4333';
+  const DARKRED = '#7F1D1D';
+  const GRID = 'rgba(0,0,0,0.06)';
+  const TICK = '#9CA3AF';
+  const PALETTE = ['#EA4333','#7F1D1D','#C53030','#059669','#D97706','#EA580C','#6B7280','#374151'];
+
+  // Monthly trend
+  const months = ['Jan','Feb','Mar','Apr','May'];
+  const monthVals = [1,2,3,4,5].map(m => DATA.monthly[m] || 0);
+  charts.monthly = new Chart(document.getElementById('monthlyChart'), {
+    type: 'bar',
+    data: {
+      labels: months,
+      datasets: [{
+        label: 'Approved Spend',
+        data: monthVals,
+        backgroundColor: monthVals.map((v,i) => i===3 ? RED : 'rgba(234,67,51,0.2)'),
+        borderColor: monthVals.map((v,i) => i===3 ? RED : 'rgba(234,67,51,0.4)'),
+        borderWidth: 1, borderRadius: 6,
+        yAxisID: 'y'
+      },{
+        label: 'Trend',
+        data: monthVals,
+        type: 'line', borderColor: DARKRED, borderWidth: 2,
+        pointBackgroundColor: DARKRED, tension: 0.4, fill: false,
+        yAxisID: 'y'
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { labels: { color: TICK, font: { family: 'Inter', size: 11 } } } },
+      scales: {
+        y: { grid: { color: GRID }, ticks: { color: TICK, callback: v => fmtINR(v) } },
+        x: { grid: { display: false }, ticks: { color: TICK } }
+      }
+    }
+  });
+
+  // Category donut
+  const catKeys = Object.keys(DATA.categories);
+  const catVals = Object.values(DATA.categories);
+  charts.catDonut = new Chart(document.getElementById('categoryDonut'), {
+    type: 'doughnut',
+    data: {
+      labels: catKeys.map(k => k.replace(' Expenses','').replace(' Charges','')),
+      datasets: [{ data: catVals, backgroundColor: PALETTE, borderWidth: 2, borderColor: '#fff', hoverOffset: 6 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true, cutout: '65%',
+      plugins: { legend: { position: 'bottom', labels: { color: TICK, font: { size: 10 }, boxWidth: 10, padding: 8 } } }
+    }
+  });
+
+  // Category bar
+  charts.catBar = new Chart(document.getElementById('catBarChart'), {
+    type: 'bar',
+    data: {
+      labels: catKeys.map(k => k.length > 20 ? k.slice(0,18)+'…' : k),
+      datasets: [{ label: 'Spend', data: catVals, backgroundColor: PALETTE, borderWidth: 0, borderRadius: 5 }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: GRID }, ticks: { color: TICK, callback: v => fmtINR(v) } },
+        y: { grid: { display: false }, ticks: { color: '#374151', font: { size: 11 } } }
+      }
+    }
+  });
+
+  // Spike chart
+  charts.spike = new Chart(document.getElementById('spikeChart'), {
+    type: 'line',
+    data: {
+      labels: ['Jan','Feb','Mar','Apr','May'],
+      datasets: [{
+        label: 'MoM Spend',
+        data: [322570.22, 1241224.22, 21270770.17, 97690242.57, 139957.35],
+        borderColor: RED, backgroundColor: 'rgba(234,67,51,0.07)',
+        fill: true, tension: 0.4, borderWidth: 2, pointBackgroundColor: RED, pointRadius: 5
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: TICK } } },
+      scales: {
+        y: { grid: { color: GRID }, ticks: { color: TICK, callback: v => fmtINR(v) } },
+        x: { grid: { display: false }, ticks: { color: TICK } }
+      }
+    }
+  });
+}
+
+// ==================== TABLES ====================
+function buildSDTable() {
+  const total = DATA.total_approved;
+  const tbody = document.getElementById('sd-table-body');
+  tbody.innerHTML = DATA.sd_list.map((sd, i) => {
+    const share = (sd.total/total*100);
+    const barW = Math.min(100, share * 5);
+    return `<tr>
+      <td class="rank-num">${i+1}</td>
+      <td class="name-cell">${sd.name}</td>
+      <td class="amount">${fmtINR(sd.total)}</td>
+      <td>${sd.centers.toLocaleString()}</td>
+      <td>
+        <div class="bar-cell">
+          <div class="bar-bg"><div class="bar-fill" style="width:${barW}%;background:${share>10?'var(--red)':share>5?'var(--orange)':'var(--accent)'}"></div></div>
+          <span style="font-family:var(--mono);font-size:11px;color:var(--text2);width:38px">${share.toFixed(1)}%</span>
+        </div>
+      </td>
+      <td>${severity(share)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function buildHierarchyTables() {
+  const total = DATA.total_approved;
+  // SD table
+  document.getElementById('sd-hier-body').innerHTML = DATA.sd_list.map((sd, i) => {
+    const share = (sd.total/total*100);
+    return `<tr>
+      <td class="rank-num">${i+1}</td>
+      <td class="name-cell">${sd.name}</td>
+      <td class="amount">${fmtINR(sd.total)}</td>
+      <td>${sd.centers.toLocaleString()}</td>
+      <td style="font-family:var(--mono);font-size:12px;color:var(--text2)">${share.toFixed(1)}%</td>
+      <td>${severity(share)}</td>
+    </tr>`;
+  }).join('');
+  // Director table
+  document.getElementById('dir-hier-body').innerHTML = DATA.d_list.map((d, i) => {
+    const share = (d.total/total*100);
+    return `<tr>
+      <td class="rank-num">${i+1}</td>
+      <td class="name-cell">${d.name}</td>
+      <td><span style="font-size:12px;color:var(--text2)">${d.sd}</span></td>
+      <td class="amount">${fmtINR(d.total)}</td>
+      <td>${d.centers.toLocaleString()}</td>
+      <td>${severity(share)}</td>
+    </tr>`;
+  }).join('');
+  // SD cards
+  document.getElementById('sd-cards').innerHTML = DATA.sd_list.slice(0,6).map(sd => `
+    <div class="hier-card">
+      <div class="role">Senior Director</div>
+      <h3>${sd.name}</h3>
+      <div class="amount ${sd.total>10000000?'red':sd.total>5000000?'yellow':'green'}" style="font-size:18px;font-weight:700;font-family:var(--mono)">${fmtINR(sd.total)}</div>
+      <div class="meta">${sd.centers} centers</div>
+    </div>
+  `).join('');
+}
+
+function buildCategoryTable() {
+  const total = DATA.total_approved;
+  const benchmarks = {
+    'Electricity Expenses': 'Area-based (₹0.24–₹0.5/sq.ft) + State tariffs',
+    'Staff Welfare Expenses': 'Monthly spend ÷ Avg headcount ≤ ₹10/manday',
+    'Water Expenses': 'Monthly spend ÷ Avg headcount (per manday)',
+    'Labourer Charges': 'Per-bill approval with ops review',
+    'Office Maintenance Expenses': 'Min(₹2.5/sq.ft, ₹250/head), max ₹5,000',
+    'Internet Expenses': 'Min(₹1,500+GST, Region 85th pct)',
+    'Office consumables': 'Incl. in Office Maintenance budget',
+    'Power & Fuel Expense': 'Under review — no cap set'
+  };
+  document.getElementById('cat-table-body').innerHTML = Object.entries(DATA.categories).map(([cat, val], i) => {
+    const share = (val/total*100);
+    return `<tr>
+      <td class="rank-num">${i+1}</td>
+      <td class="name-cell">${cat}</td>
+      <td class="amount">${fmtINR(val)}</td>
+      <td style="font-family:var(--mono);font-size:12px;color:var(--text2)">${share.toFixed(1)}%</td>
+      <td style="font-size:11px;color:var(--text2);max-width:220px">${benchmarks[cat] || 'No benchmark set'}</td>
+      <td>${severity(share)}</td>
+    </tr>`;
+  }).join('');
+
+  // Benchmark cards
+  const benchmarkInfos = [
+    { icon: '⚡', color: 'blue', title: 'Electricity', desc: 'Area-bucketed kWh estimates × state tariffs. Capped at 1,200 units max.' },
+    { icon: '💧', color: 'blue', title: 'Water', desc: 'Per-manday cost. Flag if above 90th percentile in same city.' },
+    { icon: '☕', color: 'yellow', title: 'Tea & Snacks', desc: 'Per-manday ≤ min(city 90th percentile, ₹10). Party food → Darwinbox.' },
+    { icon: '🌐', color: 'blue', title: 'Internet', desc: 'Hard cap ₹1,500+GST or region 85th percentile, whichever lower.' },
+    { icon: '🏢', color: 'yellow', title: 'Office Maintenance', desc: 'Housekeeping: ₹2.5/sq.ft or ₹250/head (lower), max ₹5,000.' },
+    { icon: '📋', color: 'red', title: 'Miscellaneous', desc: 'Office Maintenance + 30%. Approved at SD level for flexible distribution.' }
+  ];
+  document.getElementById('benchmark-cards').innerHTML = benchmarkInfos.map(b => `
+    <div class="anomaly-item">
+      <div class="anomaly-icon ${b.color}">${b.icon}</div>
+      <div class="anomaly-body">
+        <div class="anomaly-title">${b.title}</div>
+        <div class="anomaly-desc">${b.desc}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function buildAnomalies() {
+  const anomalies = [
+    { icon: '🔴', color: 'red', title: 'Bhiwandi GW — Extreme Outlier', desc: 'Single center · ₹1.63 Cr spend in April 2026. 13.5% of total approved. Requires immediate audit.', amt: '₹1.63 Cr' },
+    { icon: '🔴', color: 'red', title: 'Gurgaon Tauru GW — Single Center Spike', desc: 'Single center under SD Manjot Dhillon driving ₹89.3L. Electricity dominance suspected.', amt: '₹89.3 L' },
+    { icon: '🔴', color: 'red', title: 'Apr 2026 — 4.6× MoM Spike', desc: 'April spend is 4.6× March spend (₹9.77 Cr vs ₹2.13 Cr). Bulk billing suspected.', amt: '360% MoM' },
+    { icon: '🟡', color: 'yellow', title: 'Altesh Shaikh — 13.6% of Total Spend', desc: 'SD Altesh Shaikh controls only 3 centers but drives ₹1.65 Cr — abnormally concentrated.', amt: '₹1.65 Cr' },
+    { icon: '🟡', color: 'yellow', title: 'High Rejection Rate — Labourer Charges', desc: 'Highest transaction count category with notable rejections. Cash-based, fraud-prone segment.', amt: '6,481 txns' },
+    { icon: '🔵', color: 'blue', title: 'Water Expenses — Cash Risk', desc: 'Water claims are >15% of DC expenses and are predominantly cash-based. No quantity tracking.', amt: '₹80.7 L' },
+    { icon: '🟡', color: 'yellow', title: 'Jan–Feb 2026 — Low Submission', desc: 'Jan: ₹3.2L, Feb: ₹12.4L — unusually low. Likely delayed billing being front-loaded in March/April.', amt: 'Under-reported' },
+    { icon: '🔵', color: 'blue', title: 'Large Multi-SD Center Overlap', desc: 'Several GW centers show multiple SM/Director names suggesting split billing or concurrent access.', amt: 'Review needed' }
+  ];
+  document.getElementById('anomaly-list').innerHTML = anomalies.map(a => `
+    <div class="anomaly-item">
+      <div class="anomaly-icon ${a.color}">${a.icon}</div>
+      <div class="anomaly-body">
+        <div class="anomaly-title">${a.title}</div>
+        <div class="anomaly-desc">${a.desc}</div>
+      </div>
+      <div class="anomaly-amt">${a.amt}</div>
+    </div>
+  `).join('');
+}
+
+function buildCentersTable() {
+  const total = DATA.total_approved;
+  document.getElementById('centers-body').innerHTML = DATA.top_centers.map((c, i) => {
+    const share = (c.total/total*100);
+    return `<tr>
+      <td class="rank-num">${i+1}</td>
+      <td class="name-cell">${c.name}<span>${c.d}</span></td>
+      <td style="font-size:12px;color:var(--text2)">${c.sd}</td>
+      <td style="font-size:12px;color:var(--text2)">${c.d.split('/')[0]}</td>
+      <td class="amount">${fmtINR(c.total)}</td>
+      <td style="font-family:var(--mono);font-size:12px;color:var(--text2)">${share.toFixed(1)}%</td>
+      <td>${severity(share)}</td>
+    </tr>`;
+  }).join('');
+
+  // Populate SD filter
+  const sds = [...new Set(DATA.top_centers.map(c => c.sd))];
+  const sdSel = document.getElementById('sdFilter');
+  const cSdSel = document.getElementById('centerSdFilter');
+  sds.forEach(sd => {
+    [sdSel, cSdSel].forEach(sel => {
+      const opt = document.createElement('option'); opt.value = sd; opt.textContent = sd; sel.appendChild(opt);
+    });
+  });
+}
+
+// ==================== MAP ====================
+let mapInitialized = false;
+let leafletMap;
+function initMap() {
+  if (mapInitialized) return;
+  mapInitialized = true;
+  leafletMap = L.map('map').setView([22.5, 80], 5);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap © CARTO', maxZoom: 19
+  }).addTo(leafletMap);
+
+  const maxTotal = Math.max(...DATA.map_centers.map(c => c.total));
+  DATA.map_centers.forEach(c => {
+    if (!c.lat || !c.lng) return;
+    const ratio = c.total / maxTotal;
+    const r = Math.max(6, Math.min(30, 6 + ratio * 24));
+    const color = c.total > 10000000 ? '#EA4333' : c.total > 5000000 ? '#C53030' : c.total > 1000000 ? '#D97706' : '#7F1D1D';
+    L.circleMarker([c.lat, c.lng], {
+      radius: r, fillColor: color, color: '#ffffff',
+      weight: 2, opacity: 1, fillOpacity: 0.85
+    }).addTo(leafletMap).bindPopup(`
+      <div style="font-family:'Inter',sans-serif;min-width:180px">
+        <strong style="font-size:13px;color:#111827">${c.name}</strong><br>
+        <span style="color:#6B7280;font-size:11px">SD: ${c.sd}</span><br>
+        <span style="color:#EA4333;font-size:15px;font-weight:700">${fmtINR(c.total)}</span>
+      </div>
+    `);
+  });
+}
+
+// ==================== INIT ====================
+function updateDashboard() {}
+window.addEventListener('DOMContentLoaded', () => {
+  buildSDTable();
+  buildHierarchyTables();
+  buildCategoryTable();
+  buildAnomalies();
+  buildCentersTable();
+  initCharts();
+});
+</script>
+</body>
+</html>
